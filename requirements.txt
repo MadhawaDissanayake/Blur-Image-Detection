@@ -1,0 +1,41 @@
+# YOLO-Crop + Laplacian Blur Detection Dependencies
+# For RTX 5070 Ti (Blackwell sm_120) Support
+
+# ============================================================================
+# CRITICAL: PyTorch Installation for RTX 5070 Ti
+# ============================================================================
+# The RTX 5070 Ti requires PyTorch nightly with CUDA 12.8 support.
+# Standard PyTorch DOES NOT support sm_120 compute capability.
+#
+# Install PyTorch FIRST with this command:
+# pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+#
+# Then install the rest of the dependencies with:
+# pip install -r requirements.txt
+#
+# Verify GPU support after installation:
+# python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+# ============================================================================
+
+# Note: torch and torchvision are NOT listed here because they must be
+# installed via the nightly channel first (see instructions above)
+
+# Deep Learning & Computer Vision
+ultralytics>=8.3.0              # YOLOv8 object detection
+opencv-python==4.10.0.84        # OpenCV for image processing
+opencv-contrib-python==4.10.0.84  # Additional OpenCV modules
+numpy>=1.26.4                    # Numerical operations
+
+# RAW Image Support (Sony ARW, Nikon NEF, Canon CR2, etc.)
+rawpy==0.23.1                    # LibRaw wrapper for reading RAW files
+imageio==2.36.1                  # Image I/O library (rawpy dependency)
+
+# Configuration & Utilities
+PyYAML==6.0.2                    # YAML configuration file parsing
+python-dotenv==1.0.1             # Environment variables (optional)
+tqdm==4.66.5                     # Progress bars
+pillow>=10.4.0                   # PIL image handling
+rich==13.8.1                     # Enhanced terminal output
+
+# Optional: Performance Monitoring
+psutil==6.1.0                    # System resource monitoring

@@ -1,0 +1,262 @@
+# YOLO-Crop + Laplacian Blur Detection Configuration
+# Wildlife Photography Blur Detection System
+#
+# This is an example configuration file. Copy this to config.yaml and edit
+# with your specific paths and settings.
+#
+# cp config/config.example.yaml config/config.yaml
+
+# ============================================================================
+# INPUT/OUTPUT SETTINGS
+# ============================================================================
+paths:
+  # Source directory containing images to process
+  # Change this to your actual photo directory
+  input_dir: "C:/DATA/Projects/Photography/Input"
+
+  # Output directory for organized results
+  output_dir: "C:/DATA/Projects/Photography/BlurImageDetection/output"
+
+  # Preserve original folder structure in output (true/false)
+  # false = flat structure (all sharp images in sharp/, all blurry in blurry/)
+  # true = replicate source folder structure within sharp/blurry folders
+  preserve_structure: false
+
+  # Log file location (null = auto-generate timestamped log in logs/)
+  log_file: null
+
+# ============================================================================
+# YOLO DETECTION SETTINGS
+# ============================================================================
+yolo:
+  # Model selection
+  # yolov8n.pt = Nano (fastest, recommended for RTX 5070 Ti)
+  # yolov8s.pt = Small (balanced)
+  # yolov8m.pt = Medium (slower, more accurate)
+  model: "yolov8n.pt"
+
+  # Auto-download model from Ultralytics if not found locally
+  auto_download: true
+
+  # Target classes for wildlife detection (COCO dataset class IDs)
+  # 14=bird, 15=cat, 16=dog, 17=horse, 18=sheep, 19=cow,
+  # 20=elephant, 21=bear, 22=zebra, 23=giraffe
+  # Add or remove class IDs based on your wildlife subjects
+  target_classes: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+  # Confidence threshold for detections (0.0-1.0)
+  # Lower = more detections but more false positives
+  # Higher = fewer detections but more precise
+  # Recommended: 0.20-0.30 for wildlife
+  confidence_threshold: 0.25
+
+  # IoU (Intersection over Union) threshold for Non-Maximum Suppression
+  # Controls overlapping box removal
+  # Recommended: 0.45
+  iou_threshold: 0.45
+
+  # Maximum number of detections per image
+  # Increase if images have many subjects
+  max_detections: 10
+
+  # Image size for YOLO inference (pixels)
+  # Must be multiple of 32: 320, 416, 640, 1280
+  # Larger = slower but more accurate
+  # 640 is optimal for most cases
+  image_size: 640
+
+  # Device selection
+  # 'auto' = automatically detect best device (GPU if available, else CPU)
+  # 'cuda' = force NVIDIA GPU (RTX 5070 Ti)
+  # 'cpu' = force CPU (slower)
+  # 'mps' = Apple M1/M2 GPU (Mac only)
+  device: "auto"
+
+# ============================================================================
+# SHARPNESS DETECTION SETTINGS
+# ============================================================================
+sharpness:
+  # Laplacian variance threshold
+  # Images with variance BELOW this are considered blurry
+  # Typical ranges for wildlife photography: 100-300
+  # Lower = more lenient (fewer images marked blurry)
+  # Higher = stricter (more images marked blurry)
+  # Start with 150 and tune based on results
+  threshold: 150.0
+
+  # Strategy when multiple subjects detected in one image
+  # 'largest' = use largest bounding box only (recommended)
+  # 'average' = average sharpness across all detected subjects
+  # 'best' = use sharpest subject (maximum variance)
+  # 'worst' = use blurriest subject (minimum variance, conservative)
+  multi_subject_strategy: "largest"
+
+  # Minimum crop size validation (pixels)
+  # Reject crops smaller than this (prevents unreliable calculations)
+  # Recommended: 50x50 pixels minimum
+  min_crop_width: 50
+  min_crop_height: 50
+
+  # Padding around bounding box (percentage of box dimension)
+  # 0.0 = exact crop to bounding box
+  # 0.05 = add 5% padding on each side
+  # 0.1 = add 10% padding on each side
+  # Recommended: 0.05-0.10 to include context around subject
+  crop_padding: 0.05
+
+# ============================================================================
+# PROCESSING SETTINGS
+# ============================================================================
+processing:
+  # Batch size for YOLO inference
+  # Higher = faster processing but more GPU memory usage
+  # Recommended for RTX 5070 Ti: 16-32
+  # If out of memory errors, reduce to 8 or 4
+  batch_size: 16
+
+  # Number of worker threads for data loading
+  # Increase for faster I/O on systems with many CPU cores
+  # Recommended: 4-8
+  num_workers: 4
+
+  # Supported image file extensions
+  # Includes both standard formats and RAW formats
+  image_extensions:
+    - '.jpg'
+    - '.jpeg'
+    - '.JPG'
+    - '.JPEG'
+    - '.png'
+    - '.PNG'
+    - '.bmp'
+    - '.BMP'
+    - '.tiff'
+    - '.tif'
+    - '.TIFF'
+    - '.TIF'
+    - '.ARW'     # Sony RAW
+    - '.arw'
+    - '.NEF'     # Nikon RAW
+    - '.nef'
+    - '.CR2'     # Canon RAW
+    - '.cr2'
+    - '.CR3'     # Canon RAW (newer)
+    - '.cr3'
+    - '.DNG'     # Adobe Digital Negative
+    - '.dng'
+
+  # Case-insensitive extension matching
+  case_insensitive: true
+
+  # Skip files that have already been processed
+  # Requires metadata tracking (not yet implemented)
+  skip_processed: false
+
+# ============================================================================
+# OUTPUT ORGANIZATION
+# ============================================================================
+output:
+  # Folder names for classification results
+  sharp_folder: "sharp"
+  blurry_folder: "blurry"
+  no_detection_folder: "no_detection"
+
+  # Action for images with no wildlife detected
+  # 'move' = move to no_detection folder (recommended)
+  # 'skip' = leave in original location
+  # 'blurry' = treat as blurry (conservative approach)
+  no_detection_action: "move"
+
+  # File operation mode
+  # 'move' = move files to output folders (faster, original location is emptied)
+  # 'copy' = copy files to output folders (slower, preserves originals)
+  file_operation: "move"
+
+  # Generate summary report after processing
+  generate_report: true
+
+  # Report format
+  # 'txt' = human-readable text file
+  # 'json' = machine-readable JSON
+  # 'csv' = spreadsheet-compatible CSV
+  report_format: "txt"
+
+# ============================================================================
+# LOGGING SETTINGS
+# ============================================================================
+logging:
+  # Log level for console and file output
+  # DEBUG = detailed diagnostic information
+  # INFO = general informational messages (recommended)
+  # WARNING = warnings only
+  # ERROR = errors only
+  level: "INFO"
+
+  # Console output log level (can be different from file)
+  console_level: "INFO"
+
+  # File output log level (can be more verbose)
+  file_level: "DEBUG"
+
+  # Show progress bar during processing
+  show_progress: true
+
+  # Log message format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Date format in log messages
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+# ============================================================================
+# PERFORMANCE TUNING
+# ============================================================================
+performance:
+  # Enable GPU acceleration if available
+  # Automatically detected based on yolo.device setting
+  use_gpu: true
+
+  # Enable half-precision (FP16) inference
+  # Faster on modern GPUs (RTX 5070 Ti supports this)
+  # Slightly less accurate but usually imperceptible
+  # Set to true for maximum speed
+  half_precision: false
+
+  # Preload YOLO model into memory at startup
+  # Faster processing but uses more memory
+  preload_model: true
+
+  # Maximum memory usage limit (MB)
+  # null = unlimited
+  # Set a value if you want to limit memory consumption
+  max_memory_mb: null
+
+# ============================================================================
+# ADVANCED OPTIONS
+# ============================================================================
+advanced:
+  # Dry run mode - process images but don't actually move/copy files
+  # Useful for testing threshold values
+  dry_run: false
+
+  # Save visualization images with bounding boxes drawn
+  # Useful for debugging YOLO detections
+  save_visualizations: false
+
+  # Directory for visualization images (if enabled)
+  visualizations_dir: "output/visualizations"
+
+  # Save detailed sharpness scores to CSV file
+  # Includes image path, variance, classification for all images
+  save_scores: true
+
+  # CSV file location for sharpness scores
+  scores_file: "output/sharpness_scores.csv"
+
+  # Error handling strategy
+  # 'skip' = skip problematic images and continue processing
+  # 'stop' = halt entire process on first error
+  error_handling: "skip"
+
+  # Verify file integrity after move/copy operations
+  # Slower but safer
+  verify_operations: false

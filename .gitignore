@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.vs/
+
+# Logs
+logs/
+*.log
+
+# Output directories
+output/
+!output/.gitkeep
+!output/sharp/.gitkeep
+!output/blurry/.gitkeep
+!output/no_detection/.gitkeep
+
+# YOLO Models (large files)
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Image Files (all formats)
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.png
+*.PNG
+*.bmp
+*.BMP
+*.tiff
+*.tif
+*.TIFF
+*.TIF
+*.webp
+*.WEBP
+
+# RAW Image Files
+*.ARW
+*.arw
+*.NEF
+*.nef
+*.CR2
+*.cr2
+*.CR3
+*.cr3
+*.DNG
+*.dng
+*.RAF
+*.raf
+*.ORF
+*.orf
+*.RW2
+*.rw2
+
+# Config (user-specific paths)
+config/config.yaml
+!config/config.example.yaml
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+
+# Test files
+test_output/
