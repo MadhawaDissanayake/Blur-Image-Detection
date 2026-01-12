@@ -50,10 +50,35 @@ class SharpnessAnalyzer:
         self.method = config['sharpness'].get('method', 'variance')
         self.percentile = config['sharpness'].get('percentile', 95.0)
 
+        # Edge density parameters
+        self.edge_threshold = config['sharpness'].get('edge_threshold', 50.0)
+        self.edge_min_density = config['sharpness'].get('edge_min_density', 0.01)
+
+        # Multi-factor analysis parameters
+        self.use_center_weight = config['sharpness'].get('use_center_weight', True)
+        self.center_weight_ratio = config['sharpness'].get('center_weight_ratio', 0.5)
+        self.use_eye_detection = config['sharpness'].get('use_eye_detection', True)
+        self.eye_sharpness_weight = config['sharpness'].get('eye_sharpness_weight', 2.0)
+
+        # Combined method weights
+        self.weight_edge_density = config['sharpness'].get('weight_edge_density', 0.3)
+        self.weight_center = config['sharpness'].get('weight_center', 0.3)
+        self.weight_overall = config['sharpness'].get('weight_overall', 0.2)
+        self.weight_eye = config['sharpness'].get('weight_eye', 0.2)
+
         self.logger.info(f"Sharpness analyzer initialized - Method: {self.method}")
         self.logger.info(f"Threshold: {self.threshold}")
         if self.method == 'percentile':
             self.logger.info(f"Percentile: {self.percentile}")
+        elif self.method == 'edge_density':
+            self.logger.info(f"Edge threshold: {self.edge_threshold}")
+            self.logger.info(f"Min edge density: {self.edge_min_density}")
+        elif self.method == 'combined':
+            self.logger.info(f"Combined method - Edge: {self.weight_edge_density}, "
+                           f"Center: {self.weight_center}, Overall: {self.weight_overall}, "
+                           f"Eye: {self.weight_eye}")
+            self.logger.info(f"Use center weight: {self.use_center_weight}")
+            self.logger.info(f"Use eye detection: {self.use_eye_detection}")
         self.logger.info(f"Multi-subject strategy: {self.multi_subject_strategy}")
 
     def calculate_laplacian_variance(self, image: np.ndarray) -> float:
@@ -64,9 +89,11 @@ class SharpnessAnalyzer:
         which correspond to edges. Sharp images have strong edges, while
         blurry images have weak edges.
 
-        Two methods are supported:
+        Five methods are supported:
         - 'variance': Variance of the Laplacian (traditional method)
         - 'percentile': Percentile of absolute Laplacian values (focuses on sharpest regions)
+        - 'edge_density': Percentage of pixels with strong edges (counts well-defined edges)
+        - 'combined': Multi-factor analysis combining all methods above plus eye detection
 
         Args:
             image: Input image (BGR or grayscale)
@@ -91,10 +118,221 @@ class SharpnessAnalyzer:
             abs_laplacian = np.abs(laplacian)
             percentile_value = np.percentile(abs_laplacian, self.percentile)
             return percentile_value
+
+        elif self.method == 'edge_density':
+            # Count strong edges (edge density analysis)
+            # Sharp images have many well-defined edges
+            # Motion-blurred images have fewer strong edges even if some high values exist
+            abs_laplacian = np.abs(laplacian)
+
+            # Count pixels with strong edges (above threshold)
+            strong_edges = abs_laplacian > self.edge_threshold
+            edge_count = np.sum(strong_edges)
+            total_pixels = abs_laplacian.size
+
+            # Calculate edge density (percentage of pixels that are strong edges)
+            edge_density = (edge_count / total_pixels) * 100.0
+
+            # Also consider the average strength of strong edges
+            # This helps distinguish between many weak edges vs fewer very strong edges
+            if edge_count > 0:
+                avg_edge_strength = np.mean(abs_laplacian[strong_edges])
+            else:
+                avg_edge_strength = 0.0
+
+            # Combined metric: edge_density * (average_strength_factor)
+            # Scale the average strength to a 0-2 multiplier
+            strength_factor = min(2.0, avg_edge_strength / 100.0)
+
+            # Final score: density weighted by edge strength
+            score = edge_density * strength_factor
+
+            return score
+
+        elif self.method == 'combined':
+            # Multi-factor analysis combining all methods
+            return self._calculate_combined_sharpness(image, gray, laplacian)
+
         else:
             # Traditional variance method
             variance = laplacian.var()
             return variance
+
+    def _calculate_combined_sharpness(self, image: np.ndarray, gray: np.ndarray,
+                                     laplacian: np.ndarray) -> float:
+        """
+        Calculate combined sharpness using multiple factors.
+
+        Factors:
+        1. 95th percentile of Laplacian (overall sharpest regions)
+        2. Edge density (count of strong edges)
+        3. Center-weighted sharpness (focus on center of crop)
+        4. Eye detection & sharpness (if eyes detected, check if sharp)
+
+        Args:
+            image: Original image (BGR)
+            gray: Grayscale version
+            laplacian: Computed Laplacian
+
+        Returns:
+            Combined weighted score
+        """
+        abs_laplacian = np.abs(laplacian)
+        scores = {}
+
+        # Factor 1: 95th percentile (normalized to 0-100 scale)
+        percentile_value = np.percentile(abs_laplacian, self.percentile)
+        scores['percentile'] = min(100.0, percentile_value * 2.0)  # Scale to ~0-100
+
+        # Factor 2: Edge density
+        strong_edges = abs_laplacian > self.edge_threshold
+        edge_count = np.sum(strong_edges)
+        total_pixels = abs_laplacian.size
+        edge_density = (edge_count / total_pixels) * 100.0
+
+        if edge_count > 0:
+            avg_edge_strength = np.mean(abs_laplacian[strong_edges])
+            strength_factor = min(2.0, avg_edge_strength / 100.0)
+        else:
+            avg_edge_strength = 0.0
+            strength_factor = 0.0
+
+        scores['edge_density'] = edge_density * strength_factor
+
+        # Factor 3: Center-weighted sharpness
+        if self.use_center_weight:
+            scores['center'] = self._calculate_center_sharpness(abs_laplacian)
+        else:
+            scores['center'] = scores['percentile']  # Fallback to percentile
+
+        # Factor 4: Eye detection & sharpness
+        if self.use_eye_detection:
+            scores['eye'] = self._calculate_eye_sharpness(image, gray, abs_laplacian)
+        else:
+            scores['eye'] = scores['percentile']  # Fallback to percentile
+
+        # Normalize scores to 0-100 range for consistent weighting
+        scores['percentile'] = min(100.0, scores['percentile'])
+        scores['edge_density'] = min(100.0, scores['edge_density'])
+        scores['center'] = min(100.0, scores['center'])
+        scores['eye'] = min(100.0, scores['eye'])
+
+        # Calculate weighted average
+        combined_score = (
+            self.weight_overall * scores['percentile'] +
+            self.weight_edge_density * scores['edge_density'] +
+            self.weight_center * scores['center'] +
+            self.weight_eye * scores['eye']
+        )
+
+        self.logger.debug(f"Combined scores - Percentile: {scores['percentile']:.2f}, "
+                         f"Edge: {scores['edge_density']:.2f}, Center: {scores['center']:.2f}, "
+                         f"Eye: {scores['eye']:.2f}, Final: {combined_score:.2f}")
+
+        return combined_score
+
+    def _calculate_center_sharpness(self, abs_laplacian: np.ndarray) -> float:
+        """
+        Calculate sharpness focusing on the center region of the crop.
+
+        Wildlife subjects are typically centered in the crop, so the center
+        region is more important than edges/corners.
+
+        Args:
+            abs_laplacian: Absolute Laplacian values
+
+        Returns:
+            Center-weighted sharpness score (0-100)
+        """
+        h, w = abs_laplacian.shape
+
+        # Define center region (middle 50% of image)
+        center_h_start = int(h * 0.25)
+        center_h_end = int(h * 0.75)
+        center_w_start = int(w * 0.25)
+        center_w_end = int(w * 0.75)
+
+        # Extract center region
+        center_region = abs_laplacian[center_h_start:center_h_end,
+                                     center_w_start:center_w_end]
+
+        if center_region.size == 0:
+            return 0.0
+
+        # Calculate 95th percentile of center region
+        center_percentile = np.percentile(center_region, self.percentile)
+
+        # Scale to 0-100
+        score = min(100.0, center_percentile * 2.0)
+
+        return score
+
+    def _calculate_eye_sharpness(self, image: np.ndarray, gray: np.ndarray,
+                                abs_laplacian: np.ndarray) -> float:
+        """
+        Detect eyes and calculate their sharpness.
+
+        For wildlife photography, sharp eyes are critical. This method:
+        1. Uses OpenCV cascade classifier to detect eyes
+        2. Calculates sharpness specifically in eye regions
+        3. Returns boosted score if eyes are detected and sharp
+
+        Args:
+            image: Original BGR image
+            gray: Grayscale version
+            abs_laplacian: Absolute Laplacian values
+
+        Returns:
+            Eye sharpness score (0-100)
+        """
+        try:
+            # Try to load eye cascade classifier
+            eye_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + 'haarcascade_eye.xml'
+            )
+
+            # Detect eyes
+            eyes = eye_cascade.detectMultiScale(gray, scaleFactor=1.1,
+                                               minNeighbors=5, minSize=(10, 10))
+
+            if len(eyes) == 0:
+                # No eyes detected - fallback to percentile score
+                percentile_value = np.percentile(abs_laplacian, self.percentile)
+                return min(100.0, percentile_value * 2.0)
+
+            # Eyes detected - calculate sharpness in eye regions
+            eye_sharpness_values = []
+
+            for (ex, ey, ew, eh) in eyes:
+                # Extract eye region from Laplacian
+                eye_region = abs_laplacian[ey:ey+eh, ex:ex+ew]
+
+                if eye_region.size > 0:
+                    # Calculate mean sharpness in eye region
+                    eye_sharpness = np.mean(eye_region)
+                    eye_sharpness_values.append(eye_sharpness)
+
+            if eye_sharpness_values:
+                # Use maximum eye sharpness (sharpest eye)
+                max_eye_sharpness = max(eye_sharpness_values)
+
+                # Apply boost factor for detected eyes
+                score = min(100.0, max_eye_sharpness * self.eye_sharpness_weight)
+
+                self.logger.debug(f"Eyes detected: {len(eyes)}, "
+                                f"Sharpness: {max_eye_sharpness:.2f}, Score: {score:.2f}")
+
+                return score
+            else:
+                # Eyes detected but couldn't calculate sharpness
+                percentile_value = np.percentile(abs_laplacian, self.percentile)
+                return min(100.0, percentile_value * 2.0)
+
+        except Exception as e:
+            # Eye detection failed - fallback to percentile
+            self.logger.debug(f"Eye detection failed: {e}")
+            percentile_value = np.percentile(abs_laplacian, self.percentile)
+            return min(100.0, percentile_value * 2.0)
 
     def crop_to_bbox(self, image: np.ndarray, bbox: BoundingBox,
                     padding: Optional[float] = None) -> np.ndarray:

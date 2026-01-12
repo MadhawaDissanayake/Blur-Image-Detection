@@ -12,7 +12,14 @@
       "Bash(./venv/Scripts/python:*)",
       "Bash(python -m src.main:*)",
       "Bash(python -m pip install:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(xargs:*)",
+      "Bash(for img in DSC01307 DSC01375 DSC01391 DSC01426 DSC01429)",
+      "Bash(do if [ -f \"C:\\\\DATA\\\\Projects\\\\Photography\\\\BlurImageDetection\\\\output\\\\blurry$img.ARW\" ])",
+      "Bash(then echo \"✓ $img - CORRECTLY BLURRY\")",
+      "Bash(else echo \"✗ $img - INCORRECTLY SHARP\")",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }
